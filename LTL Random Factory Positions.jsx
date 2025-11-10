@@ -383,56 +383,107 @@ const LTLTruckingGame = () => {
                 Math.abs(f.y - truck.y) < 30
               );
               
-              if (factoryAtLocation && truck.cargo.length < truck.capacity) {
-                const shipment = factoryAtLocation.currentShipment;
+              if (factoryAtLocation) {
+                let currentTruckCargo = [...truck.cargo];
+                let currentTruckPallets = currentTruckCargo.reduce((sum, s) => sum + s.pallets, 0);
+                let updatedFactories = [...factories];
                 
-                // Safety check: make sure shipment still exists and is waiting
-                if (!shipment || shipment.status !== 'waiting') {
-                  return truck;
+                // Pick up all shipments at current factory that fit
+                let currentFactory = updatedFactories.find(f => f.id === factoryAtLocation.id);
+                
+                while (currentFactory && currentFactory.currentShipment && 
+                       currentFactory.currentShipment.status === 'waiting' &&
+                       currentTruckPallets + currentFactory.currentShipment.pallets <= truck.capacity) {
+                  
+                  const shipment = currentFactory.currentShipment;
+                  
+                  // Add inventory cost
+                  const costPerPallet = shipment.color === '#ef4444' ? 500 :
+                                       shipment.color === '#3b82f6' ? 750 :
+                                       shipment.color === '#10b981' ? 600 :
+                                       900;
+                  const inventoryCost = shipment.pallets * costPerPallet;
+                  
+                  setStats(s => ({ 
+                    ...s, 
+                    totalCosts: s.totalCosts + inventoryCost 
+                  }));
+                  
+                  // Add to cargo
+                  currentTruckCargo.push(shipment);
+                  currentTruckPallets += shipment.pallets;
+                  
+                  // Clear current shipment and process next order from queue
+                  currentFactory.currentShipment = null;
+                  
+                  if (currentFactory.orderQueue.length > 0) {
+                    const nextOrder = currentFactory.orderQueue[0];
+                    const dest = warehouses[0];
+                    const newShipment = {
+                      id: `ship-${nextShipmentIdRef.current++}`,
+                      productType: currentFactory.productType,
+                      productEmoji: currentFactory.productEmoji,
+                      origin: currentFactory.id,
+                      destination: dest.id,
+                      finalDestination: nextOrder.storeId,
+                      color: nextOrder.storeColor,
+                      pallets: nextOrder.quantity,
+                      status: 'waiting',
+                      timestamp: nextOrder.timestamp
+                    };
+                    
+                    currentFactory.currentShipment = newShipment;
+                    currentFactory.orderQueue = currentFactory.orderQueue.slice(1);
+                    setStats(s => ({ ...s, shipmentsCreated: s.shipmentsCreated + 1 }));
+                  }
                 }
                 
-                // Pick up the shipment
-                setFactories(prevFactories => 
-                  prevFactories.map(f => {
-                    if (f.id === factoryAtLocation.id) {
-                      return { ...f, currentShipment: null };
+                // Update factories with changes
+                setFactories(updatedFactories);
+                
+                // If truck still has room, find nearest factory with orders that fit
+                if (currentTruckPallets < truck.capacity) {
+                  let nearestFactory = null;
+                  let nearestDistance = Infinity;
+                  
+                  factories.forEach(f => {
+                    if (f.currentShipment && 
+                        f.currentShipment.status === 'waiting' &&
+                        currentTruckPallets + f.currentShipment.pallets <= truck.capacity) {
+                      const distance = Math.sqrt(
+                        Math.pow(f.x - truck.x, 2) + Math.pow(f.y - truck.y, 2)
+                      );
+                      if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearestFactory = f;
+                      }
                     }
-                    return f;
-                  })
-                );
+                  });
+                  
+                  if (nearestFactory) {
+                    return {
+                      ...truck,
+                      cargo: currentTruckCargo,
+                      status: 'moving',
+                      destination: { x: nearestFactory.x, y: nearestFactory.y, id: 'pickup', type: 'pickup' },
+                    };
+                  }
+                }
                 
-                // Add inventory cost - stores pay half of sales price per pallet
-                // Republix (red) pallets cost $500 each (half of $1000 sales price)
-                // Magic Pet (blue) pallets cost $750 each (half of $1500 sales price)
-                // Critter Corner (green) pallets cost $600 each (half of $1200 sales price)
-                // Mega Mart (orange) pallets cost $900 each (half of $1800 sales price)
-                const costPerPallet = shipment.color === '#ef4444' ? 500 :  // Republix
-                                     shipment.color === '#3b82f6' ? 750 :  // Magic Pet
-                                     shipment.color === '#10b981' ? 600 :  // Critter Corner
-                                     900; // Mega Mart
-                const inventoryCost = shipment.pallets * costPerPallet;
-                
-                setStats(s => ({ 
-                  ...s, 
-                  totalCosts: s.totalCosts + inventoryCost 
-                }));
-                
-                const newCargo = [...truck.cargo, shipment];
-                
-                // Find warehouse destination - stop at left side (loading dock)
-                const dest = warehouses[0];
-                
-                return {
-                  ...truck,
-                  cargo: newCargo,
-                  status: 'moving',
-                  destination: { x: dest.x - 20, y: dest.y, id: dest.id, type: 'delivery' },
-                };
+                // Go to warehouse if we picked up anything
+                if (currentTruckCargo.length > 0) {
+                  const dest = warehouses[0];
+                  return {
+                    ...truck,
+                    cargo: currentTruckCargo,
+                    status: 'moving',
+                    destination: { x: dest.x - 20, y: dest.y, id: dest.id, type: 'delivery' },
+                  };
+                }
               }
               
               // If idle and no cargo, look for factories with waiting shipments - pick oldest order
               if (truck.cargo.length === 0) {
-                // Find factory with the oldest waiting shipment
                 let oldestFactory = null;
                 let oldestTimestamp = Infinity;
                 
@@ -1166,33 +1217,18 @@ const LTLTruckingGame = () => {
                 strokeWidth="2"
               />
               
-              {/* Cargo indicator - show emoji and pallet count */}
-              {truck.cargo.length > 0 && truck.cargo.map((shipment, index) => (
-                <g key={`${truck.id}-cargo-${index}`}>
-                  {/* Product emoji */}
-                  <text
-                    x={truck.x - 8}
-                    y={truck.y}
-                    textAnchor="middle"
-                    fontSize="10"
-                    dominantBaseline="middle"
-                  >
-                    {shipment.productEmoji}
-                  </text>
-                  {/* Pallet count */}
-                  <text
-                    x={truck.x + 8}
-                    y={truck.y}
-                    textAnchor="middle"
-                    fill={shipment.color}
-                    fontSize="10"
-                    fontWeight="bold"
-                    dominantBaseline="middle"
-                  >
-                    {shipment.pallets}
-                  </text>
-                </g>
-              ))}
+              {/* Cargo indicator - show emojis only */}
+              {truck.cargo.length > 0 && (
+                <text
+                  x={truck.x}
+                  y={truck.y}
+                  textAnchor="middle"
+                  fontSize="10"
+                  dominantBaseline="middle"
+                >
+                  {truck.cargo.map(shipment => shipment.productEmoji).join('')}
+                </text>
+              )}
             </g>
           ))}
         </svg>
