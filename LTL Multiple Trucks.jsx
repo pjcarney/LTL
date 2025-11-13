@@ -1,0 +1,1222 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Truck, Package, Warehouse, Factory, Store } from 'lucide-react';
+
+const LTLTruckingGame = () => {
+  const [gameTime, setGameTime] = useState(0);
+  const [gameStartTime] = useState(new Date('2025-01-01T00:00:00'));
+  const [isPaused, setIsPaused] = useState(true);
+  const [gameSpeed, setGameSpeed] = useState(0.5);
+  
+  // Game entities
+  const [factories, setFactories] = useState([
+    { id: 'f1', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Hamburgers', productType: 'hamburger', productEmoji: '🍔', currentShipment: null, orderQueue: [] },
+    { id: 'f2', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Pizzas', productType: 'pizza', productEmoji: '🍕', currentShipment: null, orderQueue: [] },
+    { id: 'f3', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Donuts', productType: 'donut', productEmoji: '🍩', currentShipment: null, orderQueue: [] },
+    { id: 'f4', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Ice Cream', productType: 'icecream', productEmoji: '🍧', currentShipment: null, orderQueue: [] },
+    { id: 'f5', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Unicorns', productType: 'unicorn', productEmoji: '🦄', currentShipment: null, orderQueue: [] },
+    { id: 'f6', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Dragons', productType: 'dragon', productEmoji: '🐲', currentShipment: null, orderQueue: [] },
+    { id: 'f7', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Aliens', productType: 'alien', productEmoji: '👽', currentShipment: null, orderQueue: [] },
+    { id: 'f8', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Mermaids', productType: 'mermaid', productEmoji: '🧜‍♀️', currentShipment: null, orderQueue: [] },
+    { id: 'f9', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Monkeys', productType: 'monkey', productEmoji: '🐵', currentShipment: null, orderQueue: [] },
+    { id: 'f10', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Gators', productType: 'gator', productEmoji: '🐊', currentShipment: null, orderQueue: [] },
+    { id: 'f11', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Fish', productType: 'fish', productEmoji: '🐠', currentShipment: null, orderQueue: [] },
+    { id: 'f12', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Flamingos', productType: 'flamingo', productEmoji: '🦩', currentShipment: null, orderQueue: [] },
+    { id: 'f13', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Diamonds', productType: 'diamond', productEmoji: '💎', currentShipment: null, orderQueue: [] },
+    { id: 'f14', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Trophies', productType: 'trophy', productEmoji: '🏆', currentShipment: null, orderQueue: [] },
+    { id: 'f15', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Guitars', productType: 'guitar', productEmoji: '🎸', currentShipment: null, orderQueue: [] },
+    { id: 'f16', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Motorcycles', productType: 'motorcycle', productEmoji: '🏍️', currentShipment: null, orderQueue: [] },
+  ]);
+  
+  const [warehouses, setWarehouses] = useState([
+    { 
+      id: 'w1', 
+      x: 800, 
+      y: 500, 
+      name: 'Warehouse', 
+      capacity: 500, 
+      inventory: {} // Will be populated dynamically
+    },
+  ]);
+  
+  const [stores, setStores] = useState([
+    { 
+      id: 's1', 
+      x: 1280, 
+      y: 300, 
+      name: 'Republix',
+      label: 'RP',
+      demand: 0.3, 
+      color: '#ef4444',
+      products: ['hamburger', 'pizza', 'donut', 'icecream'],
+      productEmojis: { hamburger: '🍔', pizza: '🍕', donut: '🍩', icecream: '🍧' },
+      inventory: { hamburger: 0, pizza: 0, donut: 0, icecream: 0 },
+      maxInventory: 80, // 20 pallets per product * 4 products
+      openOrders: { hamburger: 0, pizza: 0, donut: 0, icecream: 0 },
+      lastOrderTime: -33 // Allow immediate first order
+    },
+    { 
+      id: 's2', 
+      x: 1320, 
+      y: 450, 
+      name: 'Magic Pet',
+      label: 'MP',
+      demand: 0.2, 
+      color: '#3b82f6',
+      products: ['unicorn', 'dragon', 'alien', 'mermaid'],
+      productEmojis: { unicorn: '🦄', dragon: '🐲', alien: '👽', mermaid: '🧜‍♀️' },
+      inventory: { unicorn: 0, dragon: 0, alien: 0, mermaid: 0 },
+      maxInventory: 80,
+      openOrders: { unicorn: 0, dragon: 0, alien: 0, mermaid: 0 },
+      lastOrderTime: -33
+    },
+    { 
+      id: 's3', 
+      x: 1320, 
+      y: 550, 
+      name: 'Critter Corner',
+      label: 'CC',
+      demand: 0.25, 
+      color: '#10b981',
+      products: ['monkey', 'gator', 'fish', 'flamingo'],
+      productEmojis: { monkey: '🐵', gator: '🐊', fish: '🐠', flamingo: '🦩' },
+      inventory: { monkey: 0, gator: 0, fish: 0, flamingo: 0 },
+      maxInventory: 80,
+      openOrders: { monkey: 0, gator: 0, fish: 0, flamingo: 0 },
+      lastOrderTime: -33
+    },
+    { 
+      id: 's4', 
+      x: 1280, 
+      y: 700, 
+      name: 'Mega Mart',
+      label: 'MM',
+      demand: 0.15, 
+      color: '#f59e0b',
+      products: ['diamond', 'trophy', 'guitar', 'motorcycle'],
+      productEmojis: { diamond: '💎', trophy: '🏆', guitar: '🎸', motorcycle: '🏍️' },
+      inventory: { diamond: 0, trophy: 0, guitar: 0, motorcycle: 0 },
+      maxInventory: 80,
+      openOrders: { diamond: 0, trophy: 0, guitar: 0, motorcycle: 0 },
+      lastOrderTime: -33
+    },
+  ]);
+  
+  const [trucks, setTrucks] = useState([
+    { id: 't1', x: 780, y: 500, capacity: 26, cargo: [], status: 'idle', destination: null, route: [], type: 'factory-warehouse' },
+    { id: 't2', x: 820, y: 500, capacity: 26, cargo: [], status: 'idle', destination: null, route: [], type: 'warehouse-store' },
+  ]);
+  
+  const [shipments, setShipments] = useState([]);
+  const nextShipmentIdRef = useRef(1);
+  
+  const [stats, setStats] = useState({
+    shipmentsCreated: 0,
+    shipmentsDelivered: 0,
+    totalRevenue: 0,
+    totalCosts: 0,
+  });
+  
+  // Game clock - 1 second real-time = 1 hour game-time, 1 pixel = 1 mile
+  const getGameDate = () => {
+    const hoursElapsed = gameTime * 0.03; // 30ms per tick = 0.03 seconds per tick
+    const gameDate = new Date(gameStartTime.getTime() + hoursElapsed * 60 * 60 * 1000);
+    return gameDate;
+  };
+
+  // Restart function
+  const restartGame = () => {
+    setGameTime(0);
+    setIsPaused(true);
+    setGameSpeed(0.5);
+    
+    setFactories([
+      { id: 'f1', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Hamburgers', productType: 'hamburger', productEmoji: '🍔', currentShipment: null, orderQueue: [] },
+      { id: 'f2', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Pizzas', productType: 'pizza', productEmoji: '🍕', currentShipment: null, orderQueue: [] },
+      { id: 'f3', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Donuts', productType: 'donut', productEmoji: '🍩', currentShipment: null, orderQueue: [] },
+      { id: 'f4', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Ice Cream', productType: 'icecream', productEmoji: '🍧', currentShipment: null, orderQueue: [] },
+      { id: 'f5', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Unicorns', productType: 'unicorn', productEmoji: '🦄', currentShipment: null, orderQueue: [] },
+      { id: 'f6', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Dragons', productType: 'dragon', productEmoji: '🐲', currentShipment: null, orderQueue: [] },
+      { id: 'f7', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Aliens', productType: 'alien', productEmoji: '👽', currentShipment: null, orderQueue: [] },
+      { id: 'f8', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Mermaids', productType: 'mermaid', productEmoji: '🧜‍♀️', currentShipment: null, orderQueue: [] },
+      { id: 'f9', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Monkeys', productType: 'monkey', productEmoji: '🐵', currentShipment: null, orderQueue: [] },
+      { id: 'f10', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Gators', productType: 'gator', productEmoji: '🐊', currentShipment: null, orderQueue: [] },
+      { id: 'f11', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Fish', productType: 'fish', productEmoji: '🐠', currentShipment: null, orderQueue: [] },
+      { id: 'f12', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Flamingos', productType: 'flamingo', productEmoji: '🦩', currentShipment: null, orderQueue: [] },
+      { id: 'f13', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Diamonds', productType: 'diamond', productEmoji: '💎', currentShipment: null, orderQueue: [] },
+      { id: 'f14', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Trophies', productType: 'trophy', productEmoji: '🏆', currentShipment: null, orderQueue: [] },
+      { id: 'f15', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Guitars', productType: 'guitar', productEmoji: '🎸', currentShipment: null, orderQueue: [] },
+      { id: 'f16', x: Math.floor(Math.random() * 500) + 100, y: Math.floor(Math.random() * 800) + 100, name: 'Motorcycles', productType: 'motorcycle', productEmoji: '🏍️', currentShipment: null, orderQueue: [] },
+    ]);
+    
+    setWarehouses([
+      { 
+        id: 'w1', 
+        x: 800, 
+        y: 500, 
+        name: 'Warehouse', 
+        capacity: 500, 
+        inventory: {}
+      },
+    ]);
+    
+    setStores([
+      { 
+        id: 's1', 
+        x: 1280, 
+        y: 300, 
+        name: 'Republix',
+        label: 'RP',
+        demand: 0.3, 
+        color: '#ef4444',
+        products: ['hamburger', 'pizza', 'donut', 'icecream'],
+        productEmojis: { hamburger: '🍔', pizza: '🍕', donut: '🍩', icecream: '🍧' },
+        inventory: { hamburger: 0, pizza: 0, donut: 0, icecream: 0 },
+        maxInventory: 80,
+        openOrders: { hamburger: 0, pizza: 0, donut: 0, icecream: 0 },
+        lastOrderTime: -33
+      },
+      { 
+        id: 's2', 
+        x: 1320, 
+        y: 450, 
+        name: 'Magic Pet',
+        label: 'MP',
+        demand: 0.2, 
+        color: '#3b82f6',
+        products: ['unicorn', 'dragon', 'alien', 'mermaid'],
+        productEmojis: { unicorn: '🦄', dragon: '🐲', alien: '👽', mermaid: '🧜‍♀️' },
+        inventory: { unicorn: 0, dragon: 0, alien: 0, mermaid: 0 },
+        maxInventory: 80,
+        openOrders: { unicorn: 0, dragon: 0, alien: 0, mermaid: 0 },
+        lastOrderTime: -33
+      },
+      { 
+        id: 's3', 
+        x: 1320, 
+        y: 550, 
+        name: 'Critter Corner',
+        label: 'CC',
+        demand: 0.25, 
+        color: '#10b981',
+        products: ['monkey', 'gator', 'fish', 'flamingo'],
+        productEmojis: { monkey: '🐵', gator: '🐊', fish: '🐠', flamingo: '🦩' },
+        inventory: { monkey: 0, gator: 0, fish: 0, flamingo: 0 },
+        maxInventory: 80,
+        openOrders: { monkey: 0, gator: 0, fish: 0, flamingo: 0 },
+        lastOrderTime: -33
+      },
+      { 
+        id: 's4', 
+        x: 1280, 
+        y: 700, 
+        name: 'Mega Mart',
+        label: 'MM',
+        demand: 0.15, 
+        color: '#f59e0b',
+        products: ['diamond', 'trophy', 'guitar', 'motorcycle'],
+        productEmojis: { diamond: '💎', trophy: '🏆', guitar: '🎸', motorcycle: '🏍️' },
+        inventory: { diamond: 0, trophy: 0, guitar: 0, motorcycle: 0 },
+        maxInventory: 80,
+        openOrders: { diamond: 0, trophy: 0, guitar: 0, motorcycle: 0 },
+        lastOrderTime: -33
+      },
+    ]);
+    
+    setTrucks([
+      { id: 't1', x: 780, y: 500, capacity: 26, cargo: [], status: 'idle', destination: null, route: [], type: 'factory-warehouse' },
+      { id: 't2', x: 820, y: 500, capacity: 26, cargo: [], status: 'idle', destination: null, route: [], type: 'warehouse-store' },
+    ]);
+    
+    setShipments([]);
+    nextShipmentIdRef.current = 1;
+    
+    setStats({
+      shipmentsCreated: 0,
+      shipmentsDelivered: 0,
+      totalRevenue: 0,
+      totalCosts: 0,
+    });
+  };
+
+  // Game loop
+  useEffect(() => {
+    if (isPaused) return;
+    
+    const interval = setInterval(() => {
+      setGameTime(prev => prev + 1);
+      
+      // Store ordering system - stores place orders for each product type separately
+      setStores(prevStores => {
+        return prevStores.map(store => {
+          // Check each product type independently for this store
+          for (const productType of store.products) {
+            const factory = factories.find(f => f.productType === productType);
+            
+            if (factory) {
+              const currentProduct = store.inventory[productType];
+              const openProduct = store.openOrders[productType];
+              const targetPerProduct = 20; // Target 20 pallets per product
+              
+              // Place order if this product's inventory + open orders < 20
+              if (currentProduct + openProduct < targetPerProduct) {
+                const orderQuantity = Math.floor(targetPerProduct - openProduct - currentProduct);
+                
+                // Only place order if quantity is at least 10 pallets AND 1 second has passed since last order
+                if (orderQuantity >= 10 && (gameTime - store.lastOrderTime) >= 33) { // 33 ticks = ~1 second
+                  // Add order to factory queue with timestamp
+                  setFactories(prevFactories =>
+                    prevFactories.map(f => {
+                      if (f.id === factory.id) {
+                        return { 
+                          ...f, 
+                          orderQueue: [...f.orderQueue, {
+                            storeId: store.id, 
+                            quantity: orderQuantity,
+                            storeColor: store.color,
+                            productType: productType,
+                            timestamp: gameTime
+                          }]
+                        };
+                      }
+                      return f;
+                    })
+                  );
+                  
+                  // Add to open orders and update last order time
+                  return { 
+                    ...store, 
+                    openOrders: { 
+                      ...store.openOrders, 
+                      [productType]: store.openOrders[productType] + orderQuantity 
+                    },
+                    lastOrderTime: gameTime
+                  };
+                }
+              }
+            }
+          }
+          
+          // Deplete inventory (customer purchases) - deplete all products proportionally
+          const totalInv = store.products.reduce((sum, prod) => sum + store.inventory[prod], 0);
+          if (totalInv > 0) {
+            const depletion = store.demand * gameSpeed * 0.1;
+            
+            // Deplete proportionally from each product
+            const newInventory = { ...store.inventory };
+            let totalPalletsSold = 0;
+            
+            store.products.forEach(productType => {
+              const depletionAmount = (store.inventory[productType] / totalInv) * depletion;
+              const newValue = Math.max(0, store.inventory[productType] - depletionAmount);
+              const palletsSold = store.inventory[productType] - newValue;
+              totalPalletsSold += palletsSold;
+              newInventory[productType] = newValue;
+            });
+            
+            // Add revenue based on pallets sold and store type
+            if (totalPalletsSold > 0) {
+              const pricePerPallet = store.color === '#ef4444' ? 1000 : 
+                                     store.color === '#3b82f6' ? 1500 :
+                                     store.color === '#10b981' ? 1200 :
+                                     1800; // Mega Mart (orange)
+              const revenue = totalPalletsSold * pricePerPallet;
+              setStats(s => ({ 
+                ...s, 
+                totalRevenue: s.totalRevenue + revenue
+              }));
+            }
+            
+            return { 
+              ...store, 
+              inventory: newInventory 
+            };
+          }
+          return store;
+        });
+      });
+      
+      // Factory production - process orders from queue in FIFO order
+      setFactories(prevFactories => {
+        return prevFactories.map(factory => {
+          // If factory has no current shipment and has orders in queue, create shipment from first order
+          if (!factory.currentShipment && factory.orderQueue.length > 0) {
+            const currentOrder = factory.orderQueue[0];
+            const dest = warehouses[0];
+            const newShipment = {
+              id: `ship-${nextShipmentIdRef.current++}`,
+              productType: factory.productType,
+              productEmoji: factory.productEmoji,
+              origin: factory.id,
+              destination: dest.id,
+              finalDestination: currentOrder.storeId,
+              color: currentOrder.storeColor,
+              pallets: currentOrder.quantity,
+              status: 'waiting',
+              timestamp: currentOrder.timestamp // Preserve timestamp from order
+            };
+            
+            setStats(s => ({ ...s, shipmentsCreated: s.shipmentsCreated + 1 }));
+            
+            // Remove the processed order from queue
+            return {
+              ...factory,
+              currentShipment: newShipment,
+              orderQueue: factory.orderQueue.slice(1), // Remove first order
+            };
+          }
+          
+          return factory;
+        });
+      });
+      
+      // Update trucks
+      setTrucks(prevTrucks => {
+        return prevTrucks.map(truck => {
+          // Factory-to-Warehouse truck logic
+          if (truck.type === 'factory-warehouse') {
+            if (truck.status === 'idle') {
+              // Check if there's a factory shipment at current location to pick up
+              const factoryAtLocation = factories.find(f => 
+                f.currentShipment && 
+                f.currentShipment.status === 'waiting' &&
+                Math.abs(f.x - truck.x) < 30 && 
+                Math.abs(f.y - truck.y) < 30
+              );
+              
+              if (factoryAtLocation) {
+                let currentTruckCargo = [...truck.cargo];
+                let currentTruckPallets = currentTruckCargo.reduce((sum, s) => sum + s.pallets, 0);
+                let updatedFactories = [...factories];
+                
+                // Pick up all shipments at current factory that fit
+                let currentFactory = updatedFactories.find(f => f.id === factoryAtLocation.id);
+                
+                while (currentFactory && currentFactory.currentShipment && 
+                       currentFactory.currentShipment.status === 'waiting' &&
+                       currentTruckPallets + currentFactory.currentShipment.pallets <= truck.capacity) {
+                  
+                  const shipment = currentFactory.currentShipment;
+                  
+                  // Add inventory cost
+                  const costPerPallet = shipment.color === '#ef4444' ? 500 :
+                                       shipment.color === '#3b82f6' ? 750 :
+                                       shipment.color === '#10b981' ? 600 :
+                                       900;
+                  const inventoryCost = shipment.pallets * costPerPallet;
+                  
+                  setStats(s => ({ 
+                    ...s, 
+                    totalCosts: s.totalCosts + inventoryCost 
+                  }));
+                  
+                  // Add to cargo
+                  currentTruckCargo.push(shipment);
+                  currentTruckPallets += shipment.pallets;
+                  
+                  // Clear current shipment and process next order from queue
+                  currentFactory.currentShipment = null;
+                  
+                  if (currentFactory.orderQueue.length > 0) {
+                    const nextOrder = currentFactory.orderQueue[0];
+                    const dest = warehouses[0];
+                    const newShipment = {
+                      id: `ship-${nextShipmentIdRef.current++}`,
+                      productType: currentFactory.productType,
+                      productEmoji: currentFactory.productEmoji,
+                      origin: currentFactory.id,
+                      destination: dest.id,
+                      finalDestination: nextOrder.storeId,
+                      color: nextOrder.storeColor,
+                      pallets: nextOrder.quantity,
+                      status: 'waiting',
+                      timestamp: nextOrder.timestamp
+                    };
+                    
+                    currentFactory.currentShipment = newShipment;
+                    currentFactory.orderQueue = currentFactory.orderQueue.slice(1);
+                    setStats(s => ({ ...s, shipmentsCreated: s.shipmentsCreated + 1 }));
+                  }
+                }
+                
+                // Update factories with changes
+                setFactories(updatedFactories);
+                
+                // If truck still has room, find nearest factory with orders that fit
+                if (currentTruckPallets < truck.capacity) {
+                  let nearestFactory = null;
+                  let nearestDistance = Infinity;
+                  
+                  factories.forEach(f => {
+                    if (f.currentShipment && 
+                        f.currentShipment.status === 'waiting' &&
+                        currentTruckPallets + f.currentShipment.pallets <= truck.capacity) {
+                      const distance = Math.sqrt(
+                        Math.pow(f.x - truck.x, 2) + Math.pow(f.y - truck.y, 2)
+                      );
+                      if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        nearestFactory = f;
+                      }
+                    }
+                  });
+                  
+                  if (nearestFactory) {
+                    return {
+                      ...truck,
+                      cargo: currentTruckCargo,
+                      status: 'moving',
+                      destination: { x: nearestFactory.x, y: nearestFactory.y, id: 'pickup', type: 'pickup' },
+                    };
+                  }
+                }
+                
+                // Go to warehouse if we picked up anything
+                if (currentTruckCargo.length > 0) {
+                  const dest = warehouses[0];
+                  return {
+                    ...truck,
+                    cargo: currentTruckCargo,
+                    status: 'moving',
+                    destination: { x: dest.x - 20, y: dest.y, id: dest.id, type: 'delivery' },
+                  };
+                }
+              }
+              
+              // If idle and no cargo, look for factories with waiting shipments - pick oldest order
+              if (truck.cargo.length === 0) {
+                let oldestFactory = null;
+                let oldestTimestamp = Infinity;
+                
+                factories.forEach(f => {
+                  if (f.currentShipment && f.currentShipment.status === 'waiting' && f.currentShipment.timestamp < oldestTimestamp) {
+                    oldestFactory = f;
+                    oldestTimestamp = f.currentShipment.timestamp;
+                  }
+                });
+                
+                if (oldestFactory) {
+                  return {
+                    ...truck,
+                    status: 'moving',
+                    destination: { x: oldestFactory.x, y: oldestFactory.y, id: 'pickup', type: 'pickup' },
+                  };
+                }
+              }
+              
+              return truck;
+            }
+            
+            if (truck.status === 'moving' && truck.destination) {
+              const dx = truck.destination.x - truck.x;
+              const dy = truck.destination.y - truck.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              
+              if (distance < 5) {
+                // Arrived at destination
+                if (truck.destination.type === 'delivery') {
+                  // Unload cargo at warehouse
+                  const deliveredCount = truck.cargo.length;
+                  const totalPallets = truck.cargo.reduce((sum, shipment) => sum + shipment.pallets, 0);
+                  
+                  // Only update warehouse if truck actually has cargo
+                  if (totalPallets > 0) {
+                    // Group pallets by product type and destination store
+                    setWarehouses(prevWarehouses => 
+                      prevWarehouses.map(w => {
+                        if (w.id === truck.destination.id) {
+                          const newInventory = { ...w.inventory };
+                          
+                          truck.cargo.forEach(shipment => {
+                            const key = `${shipment.productType}_${shipment.finalDestination}`;
+                            newInventory[key] = (newInventory[key] || 0) + shipment.pallets;
+                          });
+                          
+                          return { 
+                            ...w, 
+                            inventory: newInventory
+                          };
+                        }
+                        return w;
+                      })
+                    );
+                    
+                    setStats(s => ({ 
+                      ...s, 
+                      shipmentsDelivered: s.shipmentsDelivered + deliveredCount,
+                    }));
+                  }
+                  
+                  return {
+                    ...truck,
+                    cargo: [],
+                    status: 'idle',
+                    destination: null,
+                  };
+                } else {
+                  // Arrived at pickup location, switch to idle to trigger pickup logic
+                  return {
+                    ...truck,
+                    status: 'idle',
+                    destination: null,
+                  };
+                }
+              }
+              
+              // Move towards destination
+              const speed = 3 * gameSpeed;
+              const moveX = (dx / distance) * speed;
+              const moveY = (dy / distance) * speed;
+              
+              // Track distance traveled and add cost ($1.35 per mile, speed is in pixels/tick, 1 pixel = 1 mile)
+              const distanceTraveled = speed; // pixels = miles
+              const cost = distanceTraveled * 1.35;
+              setStats(s => ({ ...s, totalCosts: s.totalCosts + cost }));
+              
+              return {
+                ...truck,
+                x: truck.x + moveX,
+                y: truck.y + moveY,
+              };
+            }
+          }
+          
+          // Warehouse-to-Store truck logic
+          if (truck.type === 'warehouse-store') {
+            if (truck.status === 'idle') {
+              const warehouse = warehouses[0];
+              
+              // Check if at warehouse (right side) and can pick up pallets
+              if (Math.abs(truck.x - (warehouse.x + 20)) < 30 && Math.abs(truck.y - warehouse.y) < 30 && truck.cargo.length === 0) {
+                // Check all product-store combinations for any pallets (changed from 26+ to 1+)
+                const inventoryKeys = Object.keys(warehouse.inventory);
+                
+                for (const key of inventoryKeys) {
+                  if (warehouse.inventory[key] > 0) {
+                    const [productType, storeId] = key.split('_');
+                    const store = stores.find(s => s.id === storeId);
+                    const factory = factories.find(f => f.productType === productType);
+                    
+                    if (store && factory) {
+                      // Load up to 26 pallets, or whatever is available
+                      const palletsToLoad = Math.min(26, warehouse.inventory[key]);
+                      
+                      // Remove pallets from warehouse
+                      setWarehouses(prevWarehouses => 
+                        prevWarehouses.map(w => ({
+                          ...w,
+                          inventory: {
+                            ...w.inventory,
+                            [key]: w.inventory[key] - palletsToLoad
+                          }
+                        }))
+                      );
+                      
+                      return {
+                        ...truck,
+                        cargo: [{ 
+                          pallets: palletsToLoad, 
+                          color: store.color, 
+                          productType: productType,
+                          productEmoji: factory.productEmoji,
+                          destination: store.id 
+                        }],
+                        status: 'moving',
+                        destination: { x: store.x, y: store.y, id: store.id, type: 'store-delivery' },
+                      };
+                    }
+                  }
+                }
+              }
+              
+              // If not at warehouse right side, go to warehouse right side
+              if (Math.abs(truck.x - (warehouse.x + 20)) >= 30 || Math.abs(truck.y - warehouse.y) >= 30) {
+                return {
+                  ...truck,
+                  status: 'moving',
+                  destination: { x: warehouse.x + 20, y: warehouse.y, id: warehouse.id, type: 'warehouse-return' },
+                };
+              }
+              
+              return truck;
+            }
+            
+            if (truck.status === 'moving' && truck.destination) {
+              const dx = truck.destination.x - truck.x;
+              const dy = truck.destination.y - truck.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              
+              if (distance < 5) {
+                // Arrived at destination
+                if (truck.destination.type === 'store-delivery') {
+                  // Unload at store
+                  const totalPallets = truck.cargo.reduce((sum, shipment) => sum + shipment.pallets, 0);
+                  
+                  // Add pallets to store inventory by product type and clear open orders
+                  setStores(prevStores => 
+                    prevStores.map(s => {
+                      if (s.id === truck.destination.id) {
+                        const newInventory = { ...s.inventory };
+                        const newOpenOrders = { ...s.openOrders };
+                        
+                        truck.cargo.forEach(shipment => {
+                          newInventory[shipment.productType] = (newInventory[shipment.productType] || 0) + shipment.pallets;
+                          newOpenOrders[shipment.productType] = Math.max(0, newOpenOrders[shipment.productType] - shipment.pallets);
+                        });
+                        
+                        return { 
+                          ...s, 
+                          inventory: newInventory,
+                          openOrders: newOpenOrders
+                        };
+                      }
+                      return s;
+                    })
+                  );
+                  
+                  return {
+                    ...truck,
+                    cargo: [],
+                    status: 'idle',
+                    destination: null,
+                  };
+                } else {
+                  // Arrived at warehouse
+                  return {
+                    ...truck,
+                    status: 'idle',
+                    destination: null,
+                  };
+                }
+              }
+              
+              // Move towards destination
+              const speed = 3 * gameSpeed;
+              const moveX = (dx / distance) * speed;
+              const moveY = (dy / distance) * speed;
+              
+              // Track distance traveled and add cost ($1.35 per mile, speed is in pixels/tick, 1 pixel = 1 mile)
+              const distanceTraveled = speed; // pixels = miles
+              const cost = distanceTraveled * 1.35;
+              setStats(s => ({ ...s, totalCosts: s.totalCosts + cost }));
+              
+              return {
+                ...truck,
+                x: truck.x + moveX,
+                y: truck.y + moveY,
+              };
+            }
+          }
+          
+          return truck;
+        });
+      });
+      
+    }, 30);
+    
+    return () => clearInterval(interval);
+  }, [isPaused, gameSpeed, shipments, factories, warehouses, stores]);
+
+  return (
+    <div className="w-full h-screen bg-gray-900 text-white p-4">
+      {/* Header */}
+      <div className="bg-gray-800 rounded-lg p-4 mb-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold">LTL Trucking Simulator</h1>
+            <div className="text-sm text-gray-400 mt-1">
+              {getGameDate().toLocaleString('en-US', { 
+                month: '2-digit', 
+                day: '2-digit', 
+                year: 'numeric', 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: false 
+              })}
+            </div>
+          </div>
+          
+          <div className="flex gap-4 items-center">
+            <div className="text-sm">
+              <div className="flex justify-between gap-4">
+                <span>Revenue:</span>
+                <span className="font-mono text-right" style={{ minWidth: '90px' }}>${(Math.round(stats.totalRevenue / 100) * 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
+              </div>
+              <div className="flex justify-between gap-4 border-b border-white pb-0.5">
+                <span>Cost:</span>
+                <span className="font-mono text-right text-red-500" style={{ minWidth: '90px' }}>(${(Math.round(stats.totalCosts / 100) * 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span>Profit:</span>
+                <span className={`font-mono text-right ${(stats.totalRevenue - stats.totalCosts) < 0 ? 'text-red-500' : ''}`} style={{ minWidth: '90px' }}>
+                  {(() => {
+                    const profit = Math.round((stats.totalRevenue - stats.totalCosts) / 100) * 100;
+                    if (profit < 0) {
+                      return `($${Math.abs(profit).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })})`;
+                    } else {
+                      return `$${profit.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+                    }
+                  })()}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsPaused(!isPaused)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded"
+              >
+                {isPaused ? '▶ Play' : '⏸ Pause'}
+              </button>
+              
+              <button
+                onClick={restartGame}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded"
+              >
+                Restart
+              </button>
+              
+              <select
+                value={gameSpeed}
+                onChange={(e) => setGameSpeed(Number(e.target.value))}
+                className="px-3 py-2 bg-gray-700 rounded"
+              >
+                <option value={0.25}>0.5x</option>
+                <option value={0.5}>1.0x</option>
+                <option value={1}>2.0x</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      {/* Map */}
+      <div className="bg-gray-800 rounded-lg p-4 relative overflow-auto" style={{ height: 'calc(100vh - 150px)' }}>
+        <svg width="1600" height="1000" className="border border-gray-700 rounded">
+          {/* Background grid */}
+          <defs>
+            <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
+              <path d="M 50 0 L 0 0 0 50" fill="none" stroke="gray" strokeWidth="0.5" opacity="0.2"/>
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#grid)" />
+          
+          {/* Factories */}
+          {factories.map(factory => (
+            <g key={factory.id}>
+              <circle cx={factory.x} cy={factory.y} r="5" fill="#6b7280" opacity="0.3" />
+              <circle cx={factory.x} cy={factory.y} r="5" fill="#6b7280" />
+              {/* Emoji on left - larger and closer */}
+              <text x={factory.x - 10} y={factory.y + 4} textAnchor="end" fill="white" fontSize="16">
+                {factory.productEmoji}
+              </text>
+            </g>
+          ))}
+          
+          {/* Shipments and orders at factories - all on one line */}
+          {factories.map(factory => (
+            (factory.currentShipment || factory.orderQueue.length > 0) && (
+              <g key={factory.id + '-shipment'}>
+                <text x={factory.x + 10} y={factory.y + 4} textAnchor="start" fontSize="12" fontWeight="bold">
+                  {/* Current shipment first */}
+                  {factory.currentShipment && (
+                    <tspan fill={factory.currentShipment.color}>
+                      {factory.currentShipment.pallets}
+                    </tspan>
+                  )}
+                  {/* Space if both exist */}
+                  {factory.currentShipment && factory.orderQueue.length > 0 && (
+                    <tspan fill="white"> </tspan>
+                  )}
+                  {/* Order queue */}
+                  {factory.orderQueue.map((order, index) => (
+                    <tspan key={`${factory.id}-order-${index}`} fill={order.storeColor}>
+                      {order.quantity}{index < factory.orderQueue.length - 1 ? ' ' : ''}
+                    </tspan>
+                  ))}
+                </text>
+              </g>
+            )
+          ))}
+          
+          {/* Warehouses */}
+          {warehouses.map(warehouse => (
+            <g key={warehouse.id}>
+              <circle cx={warehouse.x} cy={warehouse.y} r="25" fill="#eab308" opacity="0.3" />
+              <rect 
+                x={warehouse.x - 15} 
+                y={warehouse.y - 15} 
+                width="30" 
+                height="30" 
+                fill="#eab308" 
+              />
+              <text x={warehouse.x} y={warehouse.y - 30} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.name}
+              </text>
+              
+              {/* Inventory table - show each product per store */}
+              {/* Table header with store labels */}
+              <text x={warehouse.x - 45} y={warehouse.y + 35} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 35} textAnchor="middle" fill="#ef4444" fontSize="12" fontWeight="bold">
+                RP
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 35} textAnchor="middle" fill="#3b82f6" fontSize="12" fontWeight="bold">
+                MP
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 35} textAnchor="middle" fill="#10b981" fontSize="12" fontWeight="bold">
+                CC
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 35} textAnchor="middle" fill="#f59e0b" fontSize="12" fontWeight="bold">
+                MM
+              </text>
+              
+              {/* Hamburger row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 52} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🍔
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 52} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.hamburger_s1 || 0}
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 52} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 52} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 52} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Pizza row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 67} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🍕
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 67} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.pizza_s1 || 0}
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 67} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 67} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 67} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Donut row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 82} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🍩
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 82} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.donut_s1 || 0}
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 82} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 82} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 82} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Ice cream row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 97} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🍧
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 97} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.icecream_s1 || 0}
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 97} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 97} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 97} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Unicorn row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 112} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🦄
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 112} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 112} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.unicorn_s2 || 0}
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 112} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 112} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Dragon row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 127} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🐲
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 127} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 127} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.dragon_s2 || 0}
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 127} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 127} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Alien row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 142} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                👽
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 142} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 142} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.alien_s2 || 0}
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 142} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 142} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Mermaid row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 157} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🧜‍♀️
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 157} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 157} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.mermaid_s2 || 0}
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 157} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 157} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Monkey row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 172} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🐵
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 172} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 172} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 172} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.monkey_s3 || 0}
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 172} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Gator row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 187} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🐊
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 187} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 187} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 187} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.gator_s3 || 0}
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 187} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Fish row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 202} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🐠
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 202} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 202} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 202} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.fish_s3 || 0}
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 202} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Flamingo row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 217} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🦩
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 217} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 217} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 217} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.flamingo_s3 || 0}
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 217} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              
+              {/* Diamond row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 232} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                💎
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 232} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 232} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 232} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 232} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.diamond_s4 || 0}
+              </text>
+              
+              {/* Trophy row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 247} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🏆
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 247} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 247} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 247} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 247} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.trophy_s4 || 0}
+              </text>
+              
+              {/* Guitar row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 262} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🎸
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 262} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 262} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 262} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 262} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.guitar_s4 || 0}
+              </text>
+              
+              {/* Motorcycle row */}
+              <text x={warehouse.x - 45} y={warehouse.y + 277} textAnchor="middle" fill="white" fontSize="12" fontWeight="bold">
+                🏍️
+              </text>
+              <text x={warehouse.x - 15} y={warehouse.y + 277} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 15} y={warehouse.y + 277} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 45} y={warehouse.y + 277} textAnchor="middle" fill="white" fontSize="12">
+                -
+              </text>
+              <text x={warehouse.x + 75} y={warehouse.y + 277} textAnchor="middle" fill="white" fontSize="12">
+                {warehouse.inventory.motorcycle_s4 || 0}
+              </text>
+            </g>
+          ))}
+          
+          {/* Stores */}
+          {stores.map(store => {
+            return (
+              <g key={store.id}>
+                <circle cx={store.x} cy={store.y} r="25" fill={store.color} opacity="0.3" />
+                <circle cx={store.x} cy={store.y} r="15" fill={store.color} />
+                <text x={store.x} y={store.y - 25} textAnchor="middle" fill="white" fontSize="12">
+                  {store.name}
+                </text>
+                {/* Display all 4 products in a 2x2 grid */}
+                <text x={store.x - 15} y={store.y + 35} textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">
+                  {store.productEmojis[store.products[0]]}:{Math.floor(store.inventory[store.products[0]])}
+                </text>
+                <text x={store.x + 15} y={store.y + 35} textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">
+                  {store.productEmojis[store.products[1]]}:{Math.floor(store.inventory[store.products[1]])}
+                </text>
+                <text x={store.x - 15} y={store.y + 47} textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">
+                  {store.productEmojis[store.products[2]]}:{Math.floor(store.inventory[store.products[2]])}
+                </text>
+                <text x={store.x + 15} y={store.y + 47} textAnchor="middle" fill="white" fontSize="11" fontWeight="bold">
+                  {store.productEmojis[store.products[3]]}:{Math.floor(store.inventory[store.products[3]])}
+                </text>
+              </g>
+            );
+          })}
+          
+          {/* Trucks */}
+          {trucks.map(truck => (
+            <g key={truck.id}>
+              {/* Destination line */}
+              {truck.destination && (
+                <line
+                  x1={truck.x}
+                  y1={truck.y}
+                  x2={truck.destination.x}
+                  y2={truck.destination.y}
+                  stroke="#6b7280"
+                  strokeWidth="2"
+                  strokeDasharray="5,5"
+                  opacity="0.5"
+                />
+              )}
+              
+              {/* Truck - wider to accommodate emoji and number */}
+              <rect
+                x={truck.x - 15}
+                y={truck.y - 8}
+                width="30"
+                height="16"
+                fill="#6b7280"
+                stroke="white"
+                strokeWidth="2"
+              />
+              
+              {/* Cargo indicator - show emojis only */}
+              {truck.cargo.length > 0 && (
+                <text
+                  x={truck.x}
+                  y={truck.y}
+                  textAnchor="middle"
+                  fontSize="10"
+                  dominantBaseline="middle"
+                >
+                  {truck.cargo.map(shipment => shipment.productEmoji).join('')}
+                </text>
+              )}
+            </g>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+};
+
+export default LTLTruckingGame;
